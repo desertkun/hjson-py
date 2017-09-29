@@ -25,7 +25,7 @@ def _floatconstants():
 NaN, PosInf, NegInf = _floatconstants()
 
 WHITESPACE = ' \t\n\r'
-PUNCTUATOR = '{}[],:'
+PUNCTUATOR = '{}[],:='
 
 NUMBER_RE = re.compile(r'[\t ]*(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?[\t ]*')
 STRINGCHUNK = re.compile(r'(.*?)([\'"\\\x00-\x1f])', FLAGS)
@@ -278,9 +278,9 @@ def scanKeyName(s, end, encoding=None, strict=True):
 
         if ch == '':
             raise HjsonDecodeError("Bad key name (eof)", s, end);
-        elif ch == ':':
+        elif ch == ':' or ch == '=':
             if begin == end:
-                raise HjsonDecodeError("Found ':' but no key name (for an empty key name use quotes)", s, begin)
+                raise HjsonDecodeError("Found '" + ch + "' but no key name (for an empty key name use quotes)", s, begin)
             elif space >= 0:
                 if space != end - 1: raise HjsonDecodeError("Found whitespace in your key name (use quotes to include)", s, space)
                 return s[begin:end].rstrip(), end
@@ -289,7 +289,7 @@ def scanKeyName(s, end, encoding=None, strict=True):
         elif ch in WHITESPACE:
             if space < 0 or space == end - 1: space = end
         elif ch == '{' or ch == '}' or ch == '[' or ch == ']' or ch == ',':
-            raise HjsonDecodeError("Found '" + ch + "' where a key name was expected (check your syntax or use quotes if the key name includes {}[],: or whitespace)", s, begin)
+            raise HjsonDecodeError("Found '" + ch + "' where a key name was expected (check your syntax or use quotes if the key name includes {}[],:= or whitespace)", s, begin)
         end += 1
 
 def make_scanner(context):
@@ -367,8 +367,8 @@ def JSONObject(state, encoding, strict, scan_once, object_hook,
         key = memo_get(key, key)
 
         ch, end = getNext(s, end)
-        if ch != ':':
-            raise HjsonDecodeError("Expecting ':' delimiter", s, end)
+        if ch not in [':', '=']:
+            raise HjsonDecodeError("Expecting ':' or '=' delimiter", s, end)
 
         ch, end = getNext(s, end + 1)
 
@@ -455,7 +455,7 @@ class HjsonDecoder(object):
 
     def __init__(self, encoding=None, object_hook=None, parse_float=None,
             parse_int=None, strict=True,
-            object_pairs_hook=None):
+            object_pairs_hook=None, tfnns_hook=None):
         """
         *encoding* determines the encoding used to interpret any
         :class:`str` objects decoded by this instance (``'utf-8'`` by
@@ -506,7 +506,7 @@ class HjsonDecoder(object):
         self.parse_array = JSONArray
         self.parse_string = scanstring
         self.parse_mlstring = mlscanstring
-        self.parse_tfnns = scantfnns
+        self.parse_tfnns = tfnns_hook or scantfnns
         self.memo = {}
         (self.scan_once, self.scan_object_once) = make_scanner(self)
 
